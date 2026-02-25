@@ -35,18 +35,26 @@ def get_headers(token: str) -> dict:
 
 def search_shows(token: str, keyword: str) -> list:
     resp = requests.get(
-        f"{API_HOST}/cyy_gatewayapi/show/pub/v3/show/search",
-        params={"keyword": keyword, "src": API_SRC, "ver": API_VER},
+        f"{API_HOST}/cyy_gatewayapi/home/pub/v3/show_list/search",
+        params={
+            "keyword": keyword,
+            "src": API_SRC, "ver": API_VER,
+            "length": 20, "offset": 0,
+            "pageType": "SEARCH_PAGE",
+            "sortType": "RECOMMEND",
+        },
         headers=get_headers(token),
     )
     data = resp.json()
-    return data.get("data", {}).get("list", []) if data.get("statusCode") == 200 else []
+    if data.get("statusCode") != 200:
+        print(f"搜索失败: {data.get('comments', '未知错误')}")
+        return []
+    return data.get("data", {}).get("searchData", [])
 
 
 def get_sessions(token: str, show_id: str) -> list:
     resp = requests.get(
-        f"{API_HOST}/cyy_gatewayapi/show/pub/v3/show/{show_id}/sessions",
-        params={"src": API_SRC, "ver": API_VER},
+        f"{API_HOST}/cyy_gatewayapi/show/pub/v5/show/{show_id}/sessions",
         headers=get_headers(token),
     )
     data = resp.json()
@@ -55,12 +63,14 @@ def get_sessions(token: str, show_id: str) -> list:
 
 def get_seat_plans(token: str, show_id: str, session_id: str) -> list:
     resp = requests.get(
-        f"{API_HOST}/cyy_gatewayapi/show/pub/v3/show/{show_id}/session/{session_id}/seat_plans",
-        params={"src": API_SRC, "ver": API_VER},
+        f"{API_HOST}/cyy_gatewayapi/show/pub/v5/show/{show_id}/session/{session_id}/seat_plans",
         headers=get_headers(token),
     )
     data = resp.json()
-    return data.get("data", []) if data.get("statusCode") == 200 else []
+    result = data.get("data", []) if data.get("statusCode") == 200 else []
+    if isinstance(result, dict):
+        return result.get("seatPlans", [])
+    return result
 
 
 def main():
