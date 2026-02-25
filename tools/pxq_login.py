@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """票星球 SMS 登录工具 — 获取 Token 并写入 config.yaml"""
+import os
 import requests
 import yaml
 import sys
@@ -25,7 +26,8 @@ HEADERS = {
 
 
 def send_sms(phone: str) -> bool:
-    resp = requests.post(
+    # Step 1: 获取图形验证 token（有些场景不需要图形验证，但 API 要求先调用）
+    resp1 = requests.post(
         f"{API_HOST}/cyy_gatewayapi/user/pub/v3/generate_photo_code",
         json={
             "src": API_SRC, "ver": API_VER,
@@ -35,18 +37,53 @@ def send_sms(phone: str) -> bool:
         },
         headers=HEADERS,
     )
-    resp = requests.post(
+    data1 = resp1.json()
+    print(f"[debug] generate_photo_code 响应: statusCode={data1.get('statusCode')}, "
+          f"comments={data1.get('comments', '')}")
+
+    if data1.get("statusCode") != 200 or not data1.get("data"):
+        print("获取图形验证码失败")
+        return False
+
+    photo_data = data1["data"]
+    unique_id = photo_data.get("uniqueIdentity", "")
+    base_code = photo_data.get("baseCode", "")
+
+    if not base_code:
+        print("未获取到图形验证码图片")
+        return False
+
+    # 保存验证码图片到本地
+    import base64
+    import subprocess
+    img_b64 = base_code.split(",")[1] if "," in base_code else base_code
+    img_bytes = base64.b64decode(img_b64)
+    captcha_path = os.path.join(os.path.dirname(__file__), "..", "captcha.jpg")
+    captcha_path = os.path.abspath(captcha_path)
+    with open(captcha_path, "wb") as f:
+        f.write(img_bytes)
+
+    # macOS 自动打开图片
+    subprocess.Popen(["open", captcha_path])
+    print(f"图形验证码已打开（也保存在 {captcha_path}）")
+    captcha_code = input("请输入图中的字符: ").strip()
+
+    # Step 2: 发送短信验证码（token 字段放验证码答案，不是 uniqueIdentity）
+    resp2 = requests.post(
         f"{API_HOST}/cyy_gatewayapi/user/pub/v3/send_verify_code",
         json={
             "src": API_SRC, "ver": API_VER,
             "verifyCodeUseType": "USER_LOGIN",
             "cellphone": phone,
             "messageType": "MOBILE",
-            "token": "",
+            "token": captcha_code,
         },
         headers=HEADERS,
     )
-    return resp.json().get("statusCode") == 200
+    data2 = resp2.json()
+    if data2.get("statusCode") != 200:
+        print(f"发送失败: {data2.get('comments', '未知错误')}")
+    return data2.get("statusCode") == 200
 
 
 def login(phone: str, code: str) -> dict:
