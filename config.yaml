@@ -1,0 +1,30 @@
+concert:
+  name: "周杰伦2026杭州演唱会"
+  price: 2380
+  weekday_preference: [saturday, sunday]
+
+sale_time: "2026-04-01 10:00:00"
+
+damai:
+  device_id: ""
+  appium_port: 4723
+  show_id: ""
+  sku_id: ""
+  viewer_name: ""
+
+maoyan:
+  device_id: ""
+  autoxjs_script: "maoyan_grab.js"
+
+piaoxingqiu:
+  phone: ""
+  access_token: ""
+  refresh_token: ""
+  show_id: ""
+  session_id: ""
+  seat_plan_id: ""
+  concurrent_requests: 3
+
+notification:
+  bark_key: ""
+  serverchan_key: ""
