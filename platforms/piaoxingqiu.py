@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import random
 import string
 import time
@@ -6,6 +7,8 @@ import time
 import aiohttp
 
 from platforms.base import PlatformGrabber
+
+logger = logging.getLogger(__name__)
 
 API_HOST = "m.piaoxingqiu.com"
 API_VER = "4.1.2-20240305183007"
@@ -139,7 +142,12 @@ class PiaoxingqiuGrabber(PlatformGrabber):
         result = await self.create_order(session, self.audience_ids)
         status = result.get("statusCode")
         if status == 200:
-            return {"success": True, "attempt": attempt, "data": result}
+            order_id = result.get("data", {}).get("orderId", "pxq_unknown")
+            return {
+                "success": True,
+                "platform": self.name,
+                "order_id": order_id,
+            }
         raise RuntimeError(
             f"attempt {attempt} failed: {result.get('comments', result)}"
         )
@@ -149,7 +157,8 @@ class PiaoxingqiuGrabber(PlatformGrabber):
         async with aiohttp.ClientSession() as session:
             for retry in range(10):
                 if self.stopped:
-                    return {"success": False, "reason": "stopped"}
+                    raise asyncio.CancelledError("被协调器停止")
+                logger.info(f"票星球 第{retry+1}轮 ({concurrent}路并发)")
                 tasks = [
                     self._single_grab(session, retry * concurrent + i)
                     for i in range(concurrent)
@@ -157,6 +166,8 @@ class PiaoxingqiuGrabber(PlatformGrabber):
                 results = await asyncio.gather(*tasks, return_exceptions=True)
                 for r in results:
                     if isinstance(r, dict) and r.get("success"):
+                        logger.info(f"票星球 抢票成功！订单: {r.get('order_id')}")
                         return r
+                logger.warning(f"票星球 第{retry+1}轮全部失败")
                 await asyncio.sleep(0.2)
-        return {"success": False, "reason": "max retries exceeded"}
+        raise RuntimeError("票星球: 达到最大重试次数")

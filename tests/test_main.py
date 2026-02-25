@@ -45,6 +45,21 @@ async def test_orchestrator_stops_on_first_success():
 
 
 @pytest.mark.asyncio
+async def test_first_fail_doesnt_kill_others():
+    """When PXQ fails fast, orchestrator should NOT cancel Maoyan/Damai."""
+    from main import run_orchestrator
+    with patch("main.notify", new_callable=AsyncMock):
+        result = await run_orchestrator(
+            grabbers=[MockFail({}, "票星球"), MockSuccess({})],
+            sale_timestamp=0,
+            ntp_offset=0,
+            notify_config={},
+        )
+    assert result["success"] is True
+    assert result["platform"] == "票星球"
+
+
+@pytest.mark.asyncio
 async def test_all_fail():
     from main import run_orchestrator
     with patch("main.notify", new_callable=AsyncMock):

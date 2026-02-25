@@ -37,12 +37,23 @@ async def run_orchestrator(
     ntp_offset: float,
     notify_config: dict,
 ) -> dict:
+    active_grabbers = []
     for g in grabbers:
         try:
             await g.warmup()
             logger.info(f"[{g.name}] 预热完成")
+            active_grabbers.append(g)
         except Exception as e:
-            logger.error(f"[{g.name}] 预热失败: {e}")
+            logger.error(f"[{g.name}] 预热失败，已禁用: {e}")
+
+    if not active_grabbers:
+        logger.error("所有平台预热失败！")
+        await notify(
+            {"notification": notify_config},
+            "抢票失败",
+            "所有平台预热失败",
+        )
+        return {"success": False, "platform": "none", "order_id": ""}
 
     if sale_timestamp > 0:
         remaining = sale_timestamp - (time.time() + ntp_offset)
@@ -54,33 +65,35 @@ async def run_orchestrator(
 
     tasks = {
         asyncio.create_task(g.grab(), name=g.name): g
-        for g in grabbers
+        for g in active_grabbers
     }
 
     result = None
-    done, pending = await asyncio.wait(
-        tasks.keys(), return_when=asyncio.FIRST_COMPLETED
-    )
+    remaining = set(tasks.keys())
 
-    for task in done:
-        try:
-            r = task.result()
-            if isinstance(r, dict) and r.get("success"):
-                result = r
-                logger.info(
-                    f"=== 抢票成功！平台: {r['platform']}，"
-                    f"订单号: {r.get('order_id')} ==="
-                )
-                break
-        except Exception as e:
-            logger.error(f"[{task.get_name()}] 失败: {e}")
+    while remaining and result is None:
+        done, remaining = await asyncio.wait(
+            remaining, return_when=asyncio.FIRST_COMPLETED
+        )
+        for task in done:
+            try:
+                r = task.result()
+                if isinstance(r, dict) and r.get("success"):
+                    result = r
+                    logger.info(
+                        f"=== 抢票成功！平台: {r['platform']}，"
+                        f"订单号: {r.get('order_id')} ==="
+                    )
+                    break
+            except Exception as e:
+                logger.error(f"[{task.get_name()}] 失败: {e}")
 
-    for task in pending:
+    for task in remaining:
         grabber = tasks[task]
         grabber.stop()
         task.cancel()
-    if pending:
-        await asyncio.gather(*pending, return_exceptions=True)
+    if remaining:
+        await asyncio.gather(*remaining, return_exceptions=True)
 
     if result:
         await notify(

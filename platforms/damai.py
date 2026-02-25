@@ -40,7 +40,7 @@ class DamaiController(PlatformGrabber):
         for k, v in self._build_caps().items():
             options.set_capability(k, v)
 
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         self.driver = await loop.run_in_executor(
             None,
             lambda: webdriver.Remote(
@@ -70,7 +70,7 @@ class DamaiController(PlatformGrabber):
 
     async def _run_grab_flow(self) -> dict:
         import time
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
 
         def _flow():
             for i in range(30):
