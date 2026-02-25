@@ -81,7 +81,9 @@ class DamaiController(PlatformGrabber):
                         self._find_and_click("立即抢购", 1)):
                     time.sleep(0.3)
 
-                self._find_and_click("2380", 1)
+                price = str(self.config.get("concert", {}).get("price", ""))
+                if price:
+                    self._find_and_click(price, 1)
                 time.sleep(0.1)
 
                 viewer = self.cfg.get("viewer_name", "")

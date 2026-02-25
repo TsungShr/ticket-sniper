@@ -70,7 +70,10 @@ def main():
         print("请先运行 tools/pxq_login.py 登录")
         sys.exit(1)
 
-    keyword = input("搜索演出 (如: 周杰伦): ").strip() or "周杰伦"
+    keyword = input("搜索演出关键词 (歌手/演出名): ").strip()
+    if not keyword:
+        print("请输入搜索关键词")
+        sys.exit(1)
     shows = search_shows(token, keyword)
     if not shows:
         print("未找到相关演出")
