@@ -1,12 +1,36 @@
+import logging
 import time
 import asyncio
 import ntplib
 
+logger = logging.getLogger(__name__)
 
-def get_ntp_offset(server: str = "ntp.aliyun.com") -> float:
+NTP_SERVERS = [
+    "ntp.aliyun.com",
+    "ntp.tencent.com",
+    "cn.ntp.org.cn",
+]
+
+
+def get_ntp_offset(server: str = "ntp.aliyun.com", samples: int = 5) -> float:
+    """多次采样取中位数，减少网络抖动误差"""
     client = ntplib.NTPClient()
-    response = client.request(server, version=3)
-    return response.offset
+    offsets = []
+    for srv in NTP_SERVERS:
+        for _ in range(samples):
+            try:
+                resp = client.request(srv, version=3)
+                offsets.append(resp.offset)
+            except Exception:
+                pass
+        if len(offsets) >= samples:
+            break
+    if not offsets:
+        raise RuntimeError("所有 NTP 服务器均不可达")
+    offsets.sort()
+    median = offsets[len(offsets) // 2]
+    logger.info(f"NTP 采样 {len(offsets)} 次，范围 {offsets[0]*1000:.1f}~{offsets[-1]*1000:.1f}ms，中位数 {median*1000:.1f}ms")
+    return median
 
 
 async def wait_until_sale_time(sale_timestamp: float, ntp_offset: float) -> None:
