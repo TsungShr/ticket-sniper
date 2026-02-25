@@ -43,8 +43,6 @@ async def test_full_flow_pxq_success():
     with patch("main.notify", new_callable=AsyncMock):
         result = await run_orchestrator(
             grabbers=[MockPXQ({}), MockMaoyan({}), MockDamai({})],
-            sale_timestamp=0,
-            ntp_offset=0,
             notify_config={},
         )
     assert result["success"] is True
@@ -58,8 +56,6 @@ async def test_all_fail():
     with patch("main.notify", new_callable=AsyncMock):
         result = await run_orchestrator(
             grabbers=[MockFail({}, "票星球"), MockFail({}, "猫眼"), MockFail({}, "大麦")],
-            sale_timestamp=0,
-            ntp_offset=0,
             notify_config={},
         )
     assert result["success"] is False

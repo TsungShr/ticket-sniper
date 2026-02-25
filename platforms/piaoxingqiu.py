@@ -23,11 +23,10 @@ UA = (
 class PiaoxingqiuGrabber(PlatformGrabber):
     name = "票星球"
 
-    def __init__(self, config: dict):
-        super().__init__(config)
-        self.cfg = config["piaoxingqiu"]
-        self.access_token = self.cfg["access_token"]
-        self.refresh_token_str = self.cfg["refresh_token"]
+    def __init__(self, cfg: dict, ntp_offset: float = 0.0):
+        super().__init__(cfg, ntp_offset)
+        self.access_token = cfg["access_token"]
+        self.refresh_token_str = cfg["refresh_token"]
         self.audience_ids: list[str] = []
 
     # ---- helpers ----
@@ -159,6 +158,7 @@ class PiaoxingqiuGrabber(PlatformGrabber):
         )
 
     async def grab(self) -> dict:
+        await self.wait_for_sale()
         concurrent = self.cfg.get("concurrent_requests", 1)
         async with aiohttp.ClientSession() as session:
             for retry in range(10):

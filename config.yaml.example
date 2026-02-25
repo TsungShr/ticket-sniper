@@ -7,14 +7,14 @@ sale_time: "2026-04-01 10:00:00"
 
 damai:
   device_id: ""
-  appium_port: 4723
-  show_id: ""
-  sku_id: ""
   viewer_name: ""
+  # 坐标通过 python tools/damai_calibrate.py 校准
+  buy_btn: [1600, 2650]
+  confirm_btn: [920, 2500]
 
 maoyan:
   device_id: ""
-  autoxjs_script: "maoyan_grab.js"
+  viewer_name: ""
 
 piaoxingqiu:
   phone: ""

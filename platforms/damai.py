@@ -2,123 +2,88 @@ import asyncio
 import logging
 
 from platforms.base import PlatformGrabber
+from utils.adb import adb_shell, adb_tap, adb_screencap
 
 logger = logging.getLogger(__name__)
 
+DAMAI_ACTIVITY = "cn.damai/.launcher.splash.SplashMainActivity"
+
 
 class DamaiController(PlatformGrabber):
-    """大麦 Appium 辅助型自动化"""
+    """大麦 ADB 坐标点击自动化
+
+    大麦使用自定义渲染框架，uiautomator dump 无法工作。
+    改用坐标点击方案：用户提前停在演出详情页，
+    配置好各按钮坐标，抢票时快速点击。
+
+    config.yaml 配置示例:
+      damai:
+        device_id: '3KQYD25227201783'
+        # 坐标通过 tools/damai_calibrate.py 获取
+        buy_btn: [1600, 2650]        # "立即购买" 按钮
+        confirm_btn: [920, 2500]     # "确认" / "提交订单" 按钮
+    """
 
     @property
     def name(self) -> str:
         return "大麦"
 
-    def __init__(self, config: dict):
-        super().__init__(config)
-        self.cfg = config.get("damai", {})
-        self.device_id = self.cfg.get("device_id", "")
-        self.appium_port = self.cfg.get("appium_port", 4723)
-        self.driver = None
+    def __init__(self, cfg: dict, ntp_offset: float = 0.0):
+        super().__init__(cfg, ntp_offset)
+        self.device_id = cfg.get("device_id", "")
+        self.buy_btn = cfg.get("buy_btn", [1600, 2650])
+        self.confirm_btn = cfg.get("confirm_btn", [920, 2500])
 
-    def _build_caps(self) -> dict:
-        return {
-            "platformName": "Android",
-            "automationName": "UiAutomator2",
-            "deviceName": self.device_id,
-            "appPackage": "cn.damai",
-            "appActivity": "cn.damai.homepage.MainActivity",
-            "noReset": True,
-            "autoGrantPermissions": True,
-            "newCommandTimeout": 300,
-        }
-
-    async def _connect_appium(self) -> None:
-        from appium import webdriver
-        from appium.options.android import UiAutomator2Options
-
-        options = UiAutomator2Options()
-        for k, v in self._build_caps().items():
-            options.set_capability(k, v)
-
-        loop = asyncio.get_running_loop()
-        self.driver = await loop.run_in_executor(
-            None,
-            lambda: webdriver.Remote(
-                f"http://127.0.0.1:{self.appium_port}",
-                options=options,
-            ),
+    async def _launch_app(self) -> None:
+        await adb_shell(
+            self.device_id,
+            f"am start -n {DAMAI_ACTIVITY}",
         )
-        logger.info(f"大麦 Appium 已连接设备 {self.device_id}")
+        await asyncio.sleep(3)
+        logger.info("大麦 App 已启动")
 
-    def _find_and_click(self, text: str, timeout: int = 5) -> bool:
-        from appium.webdriver.common.appiumby import AppiumBy
-        from selenium.webdriver.support.ui import WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
+    async def _grab_loop(self) -> dict:
+        bx, by = self.buy_btn
+        cx, cy = self.confirm_btn
 
-        try:
-            el = WebDriverWait(self.driver, timeout).until(
-                EC.presence_of_element_located(
-                    (AppiumBy.XPATH,
-                     f'//*[contains(@text, "{text}")]')
-                )
-            )
-            el.click()
-            logger.info(f"大麦: 点击 [{text}]")
-            return True
-        except Exception:
-            return False
+        for attempt in range(60):
+            if self.stopped:
+                raise asyncio.CancelledError("被协调器停止")
 
-    async def _run_grab_flow(self) -> dict:
-        import time
-        loop = asyncio.get_running_loop()
+            if attempt % 10 == 0:
+                logger.info(f"大麦 第{attempt + 1}次尝试")
 
-        def _flow():
-            for i in range(30):
-                if self.stopped:
-                    raise RuntimeError("被协调器停止")
+            # Rapidly tap buy button
+            await adb_tap(self.device_id, bx, by)
+            await asyncio.sleep(0.15)
 
-                if (self._find_and_click("立即购买", 1) or
-                        self._find_and_click("立即抢购", 1)):
-                    time.sleep(0.3)
+            # Tap confirm/submit button
+            await adb_tap(self.device_id, cx, cy)
+            await asyncio.sleep(0.15)
 
-                price = str(self.config.get("concert", {}).get("price", ""))
-                if price:
-                    self._find_and_click(price, 1)
-                time.sleep(0.1)
+            # Check if we're on a payment page by trying screenshot every 10 rounds
+            if attempt > 0 and attempt % 10 == 0:
+                try:
+                    path = await adb_screencap(
+                        self.device_id, "/tmp/damai_check.png"
+                    )
+                    logger.info(f"大麦 截图保存: {path} (请检查进度)")
+                except Exception:
+                    pass
 
-                viewer = self.cfg.get("viewer_name", "")
-                if viewer:
-                    self._find_and_click(viewer, 1)
-                    time.sleep(0.1)
-
-                if self._find_and_click("同意以上协议并提交订单", 1):
-                    logger.info("=== 大麦: 已自动提交订单 ===")
-                    time.sleep(1)
-                    from appium.webdriver.common.appiumby import AppiumBy
-                    try:
-                        self.driver.find_element(
-                            AppiumBy.XPATH,
-                            '//*[contains(@text, "支付")]'
-                        )
-                        return {
-                            "success": True,
-                            "platform": "大麦",
-                            "order_id": "damai_appium",
-                        }
-                    except Exception:
-                        pass
-
-                time.sleep(0.3)
-
-            raise RuntimeError("大麦: 达到最大重试次数")
-
-        return await loop.run_in_executor(None, _flow)
+        raise RuntimeError("大麦: 达到最大重试次数")
 
     async def warmup(self) -> None:
-        await self._connect_appium()
-        logger.info("大麦预热完成 — 请确保已手动登录并进入演出详情页")
+        await self._launch_app()
+        logger.info(
+            f"大麦预热完成 — 请确保已手动登录并进入演出详情页\n"
+            f"  购买按钮坐标: {self.buy_btn}\n"
+            f"  确认按钮坐标: {self.confirm_btn}\n"
+            f"  如需校准，运行: python tools/damai_calibrate.py"
+        )
 
     async def grab(self) -> dict:
+        await self.wait_for_sale()
         return await asyncio.wait_for(
-            self._run_grab_flow(), timeout=120
+            self._grab_loop(), timeout=120
         )

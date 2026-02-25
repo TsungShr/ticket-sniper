@@ -1,30 +1,38 @@
-concert:
-  name: "周杰伦2026杭州演唱会"
-  price: 2380
-  weekday_preference: [saturday, sunday]
-
-sale_time: "2026-04-01 10:00:00"
-
-damai:
-  device_id: ""
-  appium_port: 4723
-  show_id: ""
-  sku_id: ""
-  viewer_name: ""
-
-maoyan:
-  device_id: ""
-  autoxjs_script: "maoyan_grab.js"
-
-piaoxingqiu:
-  phone: ""
-  access_token: ""
-  refresh_token: ""
-  show_id: ""
-  session_id: ""
-  seat_plan_id: ""
-  concurrent_requests: 3
-
 notification:
-  bark_key: ""
-  serverchan_key: ""
+  bark_key: ''
+  serverchan_key: ''
+
+# === 猫眼: 薛之谦万兽之王广州站 ===
+maoyan:
+  device_id: '3KQYD25227201783'
+  viewer_name: ''
+  sale_time: '2026-02-26 17:17:00'
+  concert_name: 薛之谦万兽之王巡回演唱会-广州站
+  price: 317
+
+# === 大麦: 薛之谦万兽之王广州站（2月28日测） ===
+damai:
+  device_id: ''
+  viewer_name: ''
+  sale_time: '2026-02-28 17:17:00'
+  concert_name: 薛之谦万兽之王巡回演唱会-广州站
+  price: 317
+  buy_btn: [1600, 2650]
+  confirm_btn: [920, 2500]
+
+# === 票星球: 颜人中福州站 ===
+piaoxingqiu:
+  access_token: eyJ0eXAiOiJKV1QiLCJjdHkiOiJKV1QiLCJ6aXAiOiJERUYiLCJhbGciOiJSUzUxMiJ9.eNp8kMFqwzAMht9F5xxkxXbsHjNaNtgYlJWx03AcGcLWOCQurCt999lkFHbZVfr-_xO6wHJe7mLPsCGs4LTw_DCGCJsLdMP3uoDd_eP7E1SwnLr2NtSkG2eQuSdhlKTG6CCklZnLyUMp6gtmbaiVR9JGIyGi8BisLNgx-RumrFPItUMfiJSsrfOddlasbfv4WZTt4W27h2sFk5vTkIY4FkFGUvzg8Y_OOAy5LetYio5-e54nnl2K_15WZ9TP7BK_DMdsFU1DKIXWstE2_2D2Ofu6bYv2PBWgAv6aVlCQQS2vPwAAAP__.ECYN_kBHM5W1vw01l7abk0WMLxXmzMW-NcoMjq4M4S5JKFCUZS6ReXFLLNKTHpUBLKhZKMekCjjv_MwsXO62DaseM-vNaGRCnIeXUWa7YJKiM7SVTd05q_TRlN5lUxlSTExbr8DlEiW6KktAhLKWxxcyW7YD6rZJAiLrf02gYls
+  concurrent_requests: 3
+  phone: '15168369785'
+  refresh_token: eyJ0eXAiOiJKV1QiLCJjdHkiOiJKV1QiLCJ6aXAiOiJERUYiLCJhbGciOiJSUzUxMiJ9.eNp8kE1rwzAMhv-LzjnIjj_iHjM6NlgplJWx03AcGcLWOCQurCv975PXUdhlV-l530foDMtpuUs9wUpiBceF5scxJlidoRu-rgu4f3h620AFy7Frb0MjjfUNEvVSNFpJ25golFPMcXJfivqCORdrHVCaxqBERBEwOlWwQw43TDuvkWqPIUqpVe186Ix34tq2Sx9F2e5f1zu4VDD5OQ95SGMRMJLTO41_dI3HyG2sIyU6-duznWj2Of17Wc1omMlneh4ObBXWSlTCGGWN4x_MgbMv67ZoT1P5WwX0Of2Alm9n8PINAAD__w.F-VF0cf-fjHaxeGNHCB5S6A5pPvATj0Mx5tDw3m-3ak1dmU6v5MvbmWT2MaBsWzSC_DnngrU1iFfOUItgshGtz8JyNIAihBykx6dvxyZu0cPhpBcwSnkZhxDGBz-rfaxTO2FBhnvs3Hcnj3NARH1SpdApZ2MJdA5X8BndKVSXAE
+  sale_time: '2026-02-27 12:00:00'
+  concert_name: 颜人中福州站
+  price: 380
+  show_id: '6971a7be499f4c0001cdf188'
+  session_id: '6971a86ca287b200010c6410'
+  seat_plan_id: '6971a93d22d4110001ed00ab'
+  # === 周杰伦杭州站（正式用，测完切回） ===
+  # show_id: '698b06430fc9eb00019b46e4'
+  # session_id: '698b06610fc9eb00019b4742'
+  # seat_plan_id: '698c19a92dfcfa0001f80fdb'

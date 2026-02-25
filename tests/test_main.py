@@ -36,8 +36,6 @@ async def test_orchestrator_stops_on_first_success():
     with patch("main.notify", new_callable=AsyncMock):
         result = await run_orchestrator(
             grabbers=[MockSuccess({}), MockSlow({}), MockSlow({})],
-            sale_timestamp=0,
-            ntp_offset=0,
             notify_config={},
         )
     assert result["success"] is True
@@ -51,8 +49,6 @@ async def test_first_fail_doesnt_kill_others():
     with patch("main.notify", new_callable=AsyncMock):
         result = await run_orchestrator(
             grabbers=[MockFail({}, "票星球"), MockSuccess({})],
-            sale_timestamp=0,
-            ntp_offset=0,
             notify_config={},
         )
     assert result["success"] is True
@@ -65,8 +61,6 @@ async def test_all_fail():
     with patch("main.notify", new_callable=AsyncMock):
         result = await run_orchestrator(
             grabbers=[MockFail({}, "票星球"), MockFail({}, "猫眼"), MockFail({}, "大麦")],
-            sale_timestamp=0,
-            ntp_offset=0,
             notify_config={},
         )
     assert result["success"] is False
