@@ -131,8 +131,14 @@ class PiaoxingqiuGrabber(PlatformGrabber):
         async with aiohttp.ClientSession() as session:
             await self.refresh_token(session)
             data = await self.get_audiences(session)
-            audiences = data.get("data", {}).get("audiences", [])
+            result = data.get("data", [])
+            # API 返回 list 或 dict{"audiences": [...]}
+            if isinstance(result, list):
+                audiences = result
+            else:
+                audiences = result.get("audiences", [])
             self.audience_ids = [a["id"] for a in audiences]
+            logger.info(f"票星球 观演人: {len(self.audience_ids)}人")
 
     async def _single_grab(
         self,
