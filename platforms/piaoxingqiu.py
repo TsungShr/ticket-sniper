@@ -126,8 +126,19 @@ class PiaoxingqiuGrabber(PlatformGrabber):
 
     # ---- grabber lifecycle ----
 
+    def _make_session(self) -> aiohttp.ClientSession:
+        """Create a session with optimized connection pool."""
+        conn = aiohttp.TCPConnector(
+            limit=20,           # max connections
+            limit_per_host=20,  # all to the same host
+            ttl_dns_cache=300,  # cache DNS 5 min
+            keepalive_timeout=60,
+        )
+        return aiohttp.ClientSession(connector=conn)
+
     async def warmup(self) -> None:
-        async with aiohttp.ClientSession() as session:
+        # Use a temp session for warmup API calls
+        async with self._make_session() as session:
             await self.refresh_token(session)
             data = await self.get_audiences(session)
             result = data.get("data", [])
@@ -138,6 +149,16 @@ class PiaoxingqiuGrabber(PlatformGrabber):
                 audiences = result.get("audiences", [])
             self.audience_ids = [a["id"] for a in audiences]
             logger.info(f"票星球 观演人: {len(self.audience_ids)}人")
+
+        # Pre-warm persistent session: establish TCP+TLS connections
+        self._session = self._make_session()
+        concurrent = self.cfg.get("concurrent_requests", 5)
+        warmup_tasks = [
+            self.get_show_detail(self._session)
+            for _ in range(concurrent)
+        ]
+        await asyncio.gather(*warmup_tasks, return_exceptions=True)
+        logger.info(f"票星球 连接池预热完成 ({concurrent} 条连接)")
 
     async def _single_grab(
         self,
@@ -159,21 +180,30 @@ class PiaoxingqiuGrabber(PlatformGrabber):
 
     async def grab(self) -> dict:
         await self.wait_for_sale()
-        concurrent = self.cfg.get("concurrent_requests", 1)
-        async with aiohttp.ClientSession() as session:
-            for retry in range(10):
+        concurrent = self.cfg.get("concurrent_requests", 5)
+        session = self._session
+        t0 = time.time()
+        try:
+            # Fire all rounds as a flat stream — no waiting between rounds
+            total_attempts = concurrent * 10  # 50 requests total
+            tasks = [
+                self._single_grab(session, i)
+                for i in range(total_attempts)
+            ]
+            # As each completes, check for success
+            for coro in asyncio.as_completed(tasks):
                 if self.stopped:
                     raise asyncio.CancelledError("被协调器停止")
-                logger.info(f"票星球 第{retry+1}轮 ({concurrent}路并发)")
-                tasks = [
-                    self._single_grab(session, retry * concurrent + i)
-                    for i in range(concurrent)
-                ]
-                results = await asyncio.gather(*tasks, return_exceptions=True)
-                for r in results:
+                try:
+                    r = await coro
                     if isinstance(r, dict) and r.get("success"):
-                        logger.info(f"票星球 抢票成功！订单: {r.get('order_id')}")
+                        elapsed = int((time.time() - t0) * 1000)
+                        logger.info(
+                            f"票星球 抢票成功！订单: {r.get('order_id')} ({elapsed}ms)"
+                        )
                         return r
-                logger.warning(f"票星球 第{retry+1}轮全部失败")
-                await asyncio.sleep(0.2)
-        raise RuntimeError("票星球: 达到最大重试次数")
+                except Exception:
+                    pass
+            raise RuntimeError("票星球: 全部请求均失败")
+        finally:
+            await session.close()
