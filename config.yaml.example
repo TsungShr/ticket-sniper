@@ -1,30 +1,38 @@
-concert:
-  name: "周杰伦2026杭州演唱会"
-  price: 2380
-  weekday_preference: [saturday, sunday]
+notification:
+  bark_key: ""
+  serverchan_key: ""
 
-sale_time: "2026-04-01 10:00:00"
+# === 猫眼 ===
+maoyan:
+  device_id: ""          # ADB 设备号，空则禁用
+  viewer_name: ""        # 观演人姓名
+  sale_time: "2026-04-01 10:00:00"
+  concert_name: "演唱会名称"
+  price: 1280
+  # 盲点模式坐标（可选，通过 python tools/maoyan_calibrate.py 获取）
+  # price_btn: [540, 800]
+  # viewer_btn: [540, 1200]
+  # submit_btn: [540, 1600]
 
+# === 大麦 ===
 damai:
-  device_id: ""
-  viewer_name: ""
+  device_id: ""          # ADB 设备号，空则禁用
+  sale_time: "2026-04-01 10:00:00"
+  concert_name: "演唱会名称"
+  price: 1280
   # 坐标通过 python tools/damai_calibrate.py 校准
   buy_btn: [1600, 2650]
   confirm_btn: [920, 2500]
 
-maoyan:
-  device_id: ""
-  viewer_name: ""
-
+# === 票星球 ===
 piaoxingqiu:
-  phone: ""
-  access_token: ""
+  access_token: ""       # 通过 python tools/pxq_login.py 获取
   refresh_token: ""
-  show_id: ""
+  phone: ""
+  sale_time: "2026-04-01 12:00:00"
+  concert_name: "演唱会名称"
+  price: 380
+  show_id: ""            # 通过 python tools/pxq_show.py 获取
   session_id: ""
   seat_plan_id: ""
-  concurrent_requests: 3
-
-notification:
-  bark_key: ""
-  serverchan_key: ""
+  concurrent_requests: 10
