@@ -1,3 +1,4 @@
+"""平台抢票器抽象基类"""
 import asyncio
 import logging
 import time
@@ -8,22 +9,25 @@ logger = logging.getLogger(__name__)
 
 
 class PlatformGrabber(ABC):
-    def __init__(self, cfg: dict, ntp_offset: float = 0.0):
-        self.cfg = cfg
-        self.ntp_offset = ntp_offset
-        self._stop_event = asyncio.Event()
+    def __init__(self, cfg: dict, ntp_offset: float = 0.0) -> None:
+        self.cfg: dict = cfg
+        self.ntp_offset: float = ntp_offset
+        self._stop_event: asyncio.Event = asyncio.Event()
 
     @property
     @abstractmethod
     def name(self) -> str:
+        """平台名称，如"票星球" """
         pass
 
     @abstractmethod
     async def warmup(self) -> None:
+        """预热：建立连接、校准坐标、预热资源"""
         pass
 
     @abstractmethod
     async def grab(self) -> dict:
+        """执行抢票，返回 {"success": bool, "platform": str, "order_id": str}"""
         pass
 
     def stop(self) -> None:
@@ -34,7 +38,7 @@ class PlatformGrabber(ABC):
         return self._stop_event.is_set()
 
     async def wait_for_sale(self) -> None:
-        """Wait until this platform's own sale_time. Each platform waits independently."""
+        """等待各自平台的开售时间。各平台独立等待。"""
         sale_time_str = self.cfg.get("sale_time", "")
         if not sale_time_str:
             return
@@ -45,10 +49,8 @@ class PlatformGrabber(ABC):
             logger.info(f"[{self.name}] 开售时间已过，立即开始")
             return
         logger.info(f"[{self.name}] 等待开售: {sale_time_str} (还有 {remaining:.1f}s)")
-        # Coarse wait — sleep until 200ms before sale
         if remaining > 0.2:
             await asyncio.sleep(remaining - 0.2)
-        # Busy-wait for precision
         while time.time() + self.ntp_offset < sale_ts:
             await asyncio.sleep(0.001)
         logger.info(f"[{self.name}] === 开售！===")

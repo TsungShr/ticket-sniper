@@ -36,3 +36,20 @@ piaoxingqiu:
   session_id: ""
   seat_plan_id: ""
   concurrent_requests: 10
+
+# === 淘宝购物车 ===
+# device_id 通过 ADB_DEVICES 环境变量指定，优先读取；
+# 空则从上方各平台配置中自动推断；均无则尝试第一个在线设备。
+taobao:
+  device_id: ""
+  sale_time: "2026-04-01 12:00:00"
+  concert_name: "演唱会名称"
+  # 通过 python tools/taobao_calibrate.py 获取各按钮坐标
+  checkout_btn: [1655, 2628]
+  pay_btn: [918, 2743]
+  # 开售时段（每日多场）
+  daily_times: ["14:00:00", "20:00:00"]
+  tap_lead_ms: 55        # 提前多少毫秒开始发 tap
+  tap_burst: 30          # 到点后连续发多少次
+  tap_gap_ms: 8          # 每次间隔（ms）
+  max_seconds: 12       # 最多冲多少秒

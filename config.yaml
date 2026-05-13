@@ -32,7 +32,20 @@ piaoxingqiu:
   show_id: '6971a7be499f4c0001cdf188'
   session_id: '6971a86ca287b200010c6410'
   seat_plan_id: '6971a93d22d4110001ed00ab'
-  # === 周杰伦杭州站（正式用，测完切回） ===
-  # show_id: '698b06430fc9eb00019b46e4'
-  # session_id: '698b06610fc9eb00019b4742'
-  # seat_plan_id: '698c19a92dfcfa0001f80fdb'
+  # === 淘宝购物车 ===
+taobao:
+  device_id: ""
+  sale_time: ""
+  concert_name: ""
+  checkout_btn: [1655, 2628]
+  pay_btn: [918, 2743]
+  daily_times: ["14:00:00", "20:00:00"]
+  tap_lead_ms: 55
+  tap_burst: 30
+  tap_gap_ms: 8
+  max_seconds: 12
+
+# === 周杰伦杭州站（正式用，测完切回） ===
+# show_id: '698b06430fc9eb00019b46e4'
+# session_id: '698b06610fc9eb00019b4742'
+# seat_plan_id: '698c19a92dfcfa0001f80fdb'

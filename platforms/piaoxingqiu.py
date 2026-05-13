@@ -1,12 +1,15 @@
+"""票星球 HTTP API 抢票器"""
 import asyncio
 import logging
 import random
 import string
 import time
+from typing import Any
 
 import aiohttp
 
 from platforms.base import PlatformGrabber
+from utils.http_retry import http_get, http_post
 
 logger = logging.getLogger(__name__)
 
@@ -23,15 +26,14 @@ UA = (
 class PiaoxingqiuGrabber(PlatformGrabber):
     name = "票星球"
 
-    def __init__(self, cfg: dict, ntp_offset: float = 0.0):
+    def __init__(self, cfg: dict, ntp_offset: float = 0.0) -> None:
         super().__init__(cfg, ntp_offset)
-        self.access_token = cfg["access_token"]
-        self.refresh_token_str = cfg["refresh_token"]
+        self.access_token: str = cfg["access_token"]
+        self.refresh_token_str: str = cfg["refresh_token"]
         self.audience_ids: list[str] = []
+        self._session: aiohttp.ClientSession | None = None
 
-    # ---- helpers ----
-
-    def _build_headers(self) -> dict:
+    def _build_headers(self) -> dict[str, str]:
         return {
             "User-Agent": UA,
             "access-token": self.access_token,
@@ -49,11 +51,10 @@ class PiaoxingqiuGrabber(PlatformGrabber):
         return "".join(random.choices(string.ascii_letters + string.digits, k=length))
 
     def _build_blackbox(self) -> str:
-        prefix = PiaoxingqiuGrabber._random_str(4)
+        prefix = self._random_str(4)
         ts = str(int(time.time()))
-        suffix = PiaoxingqiuGrabber._random_str(9)
+        suffix = self._random_str(9)
         base = prefix + ts + suffix
-        # insert 4 random chars at random positions
         result = list(base)
         for _ in range(4):
             pos = random.randint(0, len(result))
@@ -64,7 +65,7 @@ class PiaoxingqiuGrabber(PlatformGrabber):
         self,
         audience_ids: list[str],
         deliver_method: str = "E_TICKET",
-    ) -> dict:
+    ) -> dict[str, Any]:
         return {
             "showId": self.cfg["show_id"],
             "sessionId": self.cfg["session_id"],
@@ -73,19 +74,14 @@ class PiaoxingqiuGrabber(PlatformGrabber):
             "deliverMethod": deliver_method,
         }
 
-    # ---- low-level HTTP ----
-
-    async def _api_get(self, session: aiohttp.ClientSession, path: str) -> dict:
+    async def _api_get(self, session: aiohttp.ClientSession, path: str) -> dict[str, Any]:
         url = f"https://{API_HOST}/{path}"
         async with session.get(url, headers=self._build_headers()) as resp:
             return await resp.json()
 
     async def _api_post(
-        self,
-        session: aiohttp.ClientSession,
-        path: str,
-        json_data: dict,
-    ) -> dict:
+        self, session: aiohttp.ClientSession, path: str, json_data: dict[str, Any]
+    ) -> dict[str, Any]:
         url = f"https://{API_HOST}/{path}"
         headers = self._build_headers()
         if "create_order" in path:
@@ -93,56 +89,45 @@ class PiaoxingqiuGrabber(PlatformGrabber):
         async with session.post(url, headers=headers, json=json_data) as resp:
             return await resp.json()
 
-    # ---- API calls ----
-
-    async def refresh_token(self, session: aiohttp.ClientSession) -> dict:
+    async def refresh_token(self, session: aiohttp.ClientSession) -> dict[str, Any]:
         path = "cyy_gatewayapi/user/pub/v3/refresh_token"
-        data = await self._api_post(session, path, {
-            "refreshToken": self.refresh_token_str,
-        })
+        data = await self._api_post(session, path, {"refreshToken": self.refresh_token_str})
         if data.get("statusCode") == 200:
             result = data.get("data", {})
             self.access_token = result.get("accessToken", self.access_token)
             self.refresh_token_str = result.get("refreshToken", self.refresh_token_str)
         return data
 
-    async def get_show_detail(self, session: aiohttp.ClientSession) -> dict:
+    async def get_show_detail(self, session: aiohttp.ClientSession) -> dict[str, Any]:
         show_id = self.cfg["show_id"]
         path = f"cyy_gatewayapi/show/pub/v3/show/{show_id}"
         return await self._api_get(session, path)
 
-    async def get_audiences(self, session: aiohttp.ClientSession) -> dict:
+    async def get_audiences(self, session: aiohttp.ClientSession) -> dict[str, Any]:
         path = "cyy_gatewayapi/user/buyer/v3/user_audiences?length=500&offset=0"
         return await self._api_get(session, path)
 
     async def create_order(
-        self,
-        session: aiohttp.ClientSession,
-        audience_ids: list[str],
-    ) -> dict:
+        self, session: aiohttp.ClientSession, audience_ids: list[str]
+    ) -> dict[str, Any]:
         path = "cyy_gatewayapi/trade/buyer/order/v3/create_order?bizCode=FHL_M&src=WEB"
         payload = self._build_order_payload(audience_ids)
         return await self._api_post(session, path, payload)
 
-    # ---- grabber lifecycle ----
-
     def _make_session(self) -> aiohttp.ClientSession:
-        """Create a session with optimized connection pool."""
         conn = aiohttp.TCPConnector(
-            limit=20,           # max connections
-            limit_per_host=20,  # all to the same host
-            ttl_dns_cache=300,  # cache DNS 5 min
+            limit=20,
+            limit_per_host=20,
+            ttl_dns_cache=300,
             keepalive_timeout=60,
         )
         return aiohttp.ClientSession(connector=conn)
 
     async def warmup(self) -> None:
-        # Use a temp session for warmup API calls
         async with self._make_session() as session:
             await self.refresh_token(session)
             data = await self.get_audiences(session)
             result = data.get("data", [])
-            # API 返回 list 或 dict{"audiences": [...]}
             if isinstance(result, list):
                 audiences = result
             else:
@@ -150,7 +135,6 @@ class PiaoxingqiuGrabber(PlatformGrabber):
             self.audience_ids = [a["id"] for a in audiences]
             logger.info(f"票星球 观演人: {len(self.audience_ids)}人")
 
-        # Pre-warm persistent session: establish TCP+TLS connections
         self._session = self._make_session()
         concurrent = self.cfg.get("concurrent_requests", 5)
         warmup_tasks = [
@@ -164,7 +148,7 @@ class PiaoxingqiuGrabber(PlatformGrabber):
         self,
         session: aiohttp.ClientSession,
         attempt: int,
-    ) -> dict:
+    ) -> dict[str, Any]:
         result = await self.create_order(session, self.audience_ids)
         status = result.get("statusCode")
         if status == 200:
@@ -174,23 +158,19 @@ class PiaoxingqiuGrabber(PlatformGrabber):
                 "platform": self.name,
                 "order_id": order_id,
             }
-        raise RuntimeError(
-            f"attempt {attempt} failed: {result.get('comments', result)}"
-        )
+        raise RuntimeError(f"attempt {attempt} failed: {result.get('comments', result)}")
 
-    async def grab(self) -> dict:
+    async def grab(self) -> dict[str, Any]:
         await self.wait_for_sale()
         concurrent = self.cfg.get("concurrent_requests", 5)
         session = self._session
         t0 = time.time()
         try:
-            # Fire all rounds as a flat stream — no waiting between rounds
-            total_attempts = concurrent * 10  # 50 requests total
+            total_attempts = concurrent * 10
             tasks = [
                 self._single_grab(session, i)
                 for i in range(total_attempts)
             ]
-            # As each completes, check for success
             for coro in asyncio.as_completed(tasks):
                 if self.stopped:
                     raise asyncio.CancelledError("被协调器停止")
@@ -202,8 +182,9 @@ class PiaoxingqiuGrabber(PlatformGrabber):
                             f"票星球 抢票成功！订单: {r.get('order_id')} ({elapsed}ms)"
                         )
                         return r
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"票星球 单次请求失败: {e}")
             raise RuntimeError("票星球: 全部请求均失败")
         finally:
-            await session.close()
+            if session:
+                await session.close()

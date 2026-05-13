@@ -1,5 +1,7 @@
+"""大麦 ADB 坐标点击自动化抢票器"""
 import asyncio
 import logging
+from typing import Any
 
 from platforms.base import PlatformGrabber
 from utils.adb import adb_shell, adb_tap, adb_screencap
@@ -10,29 +12,15 @@ DAMAI_ACTIVITY = "cn.damai/.launcher.splash.SplashMainActivity"
 
 
 class DamaiController(PlatformGrabber):
-    """大麦 ADB 坐标点击自动化
-
-    大麦使用自定义渲染框架，uiautomator dump 无法工作。
-    改用坐标点击方案：用户提前停在演出详情页，
-    配置好各按钮坐标，抢票时快速点击。
-
-    config.yaml 配置示例:
-      damai:
-        device_id: '3KQYD25227201783'
-        # 坐标通过 tools/damai_calibrate.py 获取
-        buy_btn: [1600, 2650]        # "立即购买" 按钮
-        confirm_btn: [920, 2500]     # "确认" / "提交订单" 按钮
-    """
-
     @property
     def name(self) -> str:
         return "大麦"
 
-    def __init__(self, cfg: dict, ntp_offset: float = 0.0):
+    def __init__(self, cfg: dict, ntp_offset: float = 0.0) -> None:
         super().__init__(cfg, ntp_offset)
-        self.device_id = cfg.get("device_id", "")
-        self.buy_btn = cfg.get("buy_btn", [1600, 2650])
-        self.confirm_btn = cfg.get("confirm_btn", [920, 2500])
+        self.device_id: str = cfg.get("device_id", "")
+        self.buy_btn: list[int] = cfg.get("buy_btn", [1600, 2650])
+        self.confirm_btn: list[int] = cfg.get("confirm_btn", [920, 2500])
 
     async def _launch_app(self) -> None:
         await adb_shell(
@@ -42,7 +30,7 @@ class DamaiController(PlatformGrabber):
         await asyncio.sleep(3)
         logger.info("大麦 App 已启动")
 
-    async def _grab_loop(self) -> dict:
+    async def _grab_loop(self) -> dict[str, Any]:
         bx, by = self.buy_btn
         cx, cy = self.confirm_btn
 
@@ -53,15 +41,12 @@ class DamaiController(PlatformGrabber):
             if attempt % 10 == 0:
                 logger.info(f"大麦 第{attempt + 1}次尝试")
 
-            # Rapidly tap buy button
             await adb_tap(self.device_id, bx, by)
             await asyncio.sleep(0.15)
 
-            # Tap confirm/submit button
             await adb_tap(self.device_id, cx, cy)
             await asyncio.sleep(0.15)
 
-            # Check if we're on a payment page by trying screenshot every 10 rounds
             if attempt > 0 and attempt % 10 == 0:
                 try:
                     path = await adb_screencap(
@@ -82,7 +67,7 @@ class DamaiController(PlatformGrabber):
             f"  如需校准，运行: python tools/damai_calibrate.py"
         )
 
-    async def grab(self) -> dict:
+    async def grab(self) -> dict[str, Any]:
         await self.wait_for_sale()
         return await asyncio.wait_for(
             self._grab_loop(), timeout=120

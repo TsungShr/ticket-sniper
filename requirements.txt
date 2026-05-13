@@ -1,6 +1,9 @@
 aiohttp>=3.9.0
+aiohttp-retry>=2.8.0
 requests>=2.31.0
 PyYAML>=6.0
 ntplib>=0.4.0
+pillow>=10.0.0
+numpy>=1.24.0
 pytest>=7.0.0
 pytest-asyncio>=0.21.0

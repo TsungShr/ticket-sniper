@@ -1,4 +1,4 @@
-# fetch-tickets — 多平台演唱会抢票系统
+# ticket-sniper — 多平台演唱会抢票系统
 
 ## 架构概览
 

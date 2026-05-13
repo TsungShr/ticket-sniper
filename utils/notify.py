@@ -1,3 +1,4 @@
+"""推送通知 — Bark / ServerChan"""
 import aiohttp
 import logging
 from urllib.parse import quote

@@ -11,10 +11,18 @@ taobao_checkout.py  —  毫秒级购物车结算
 用法:
     python3 tools/taobao_checkout.py
 """
-import subprocess, time, datetime, sys, threading, ntplib
+import subprocess, time, datetime, sys, threading, os
+from pathlib import Path
+
+import ntplib
+
+from utils.ntp_sync import NTP_SERVERS, corrected_time, hms_to_next_ts
 
 # ==================== 配置 ====================
-DEVICE   = "3KQYD25227201783"
+# 设备 ID 通过 ADB_DEVICES 环境变量指定，优先读取；
+# 空则尝试第一个在线设备。
+ADB_DEVICES_ENV = os.environ.get("ADB_DEVICES", "").strip()
+
 CX, CY   = 1655, 2628          # 结算按钮坐标（1840×2800 实测）
 PAY_X, PAY_Y = 918, 2743      # 立即支付按钮坐标（确认订单页底部）
 
@@ -26,9 +34,31 @@ TAP_BURST    = 30              # 到点后连续发多少次
 TAP_GAP_MS   = 8               # 每次间隔（ms），持久 shell 下这是真实间隔
 MAX_SEC      = 12              # 最多冲多少秒
 
-NTP_SERVERS  = ["ntp.aliyun.com", "ntp.tencent.com", "cn.ntp.org.cn"]
 SUCCESS_HINTS = ["提交订单", "确认订单", "实付款", "收货地址"]
 # ==============================================
+
+
+def _resolve_device() -> str:
+    """从环境变量 → config.yaml → 自动检测 的顺序解析设备 ID"""
+    if ADB_DEVICES_ENV:
+        return ADB_DEVICES_ENV
+
+    config_path = Path(__file__).parent.parent / "config.yaml"
+    if config_path.exists():
+        import yaml, os
+        cfg = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+        # 依次检查各平台配置中的 device_id
+        for platform in ("maoyan", "damai", "taobao"):
+            did = cfg.get(platform, {}).get("device_id", "")
+            if did:
+                return did
+
+    # Fallback: 自动取第一个在线设备
+    out = subprocess.run(["adb", "devices"], capture_output=True, text=True).stdout
+    lines = [l.strip() for l in out.strip().splitlines() if "\tdevice" in l]
+    if lines:
+        return lines[0].split()[0]
+    return ""
 
 
 # ── NTP 校时 ──────────────────────────────────
@@ -53,20 +83,7 @@ def get_ntp_offset() -> float:
     return median
 
 
-def corrected_time(offset: float) -> float:
-    return time.time() + offset
-
-
 # ── 时间工具 ──────────────────────────────────
-def hms_to_next_ts(hms: str) -> float:
-    h, m, s = map(int, hms.split(":"))
-    now = datetime.datetime.now()
-    t = now.replace(hour=h, minute=m, second=s, microsecond=0)
-    if t.timestamp() <= now.timestamp():
-        t += datetime.timedelta(days=1)
-    return t.timestamp()
-
-
 def get_next_sale_ts() -> float:
     if SINGLE_TIME:
         return datetime.datetime.strptime(SINGLE_TIME, "%Y-%m-%d %H:%M:%S").timestamp()
@@ -165,9 +182,14 @@ def _checker_thread(device: str, earliest_ts: float = 0):
 # ── 主流程 ────────────────────────────────────
 def main():
     # 检查设备
+    device = _resolve_device()
+    if not device:
+        print("错误：未找到可用设备，请连接 Android 设备或配置 device_id")
+        sys.exit(1)
+
     out = subprocess.run(["adb", "devices"], capture_output=True, text=True).stdout
-    if DEVICE not in out:
-        print(f"错误：设备 {DEVICE} 未连接"); sys.exit(1)
+    if device not in out:
+        print(f"错误：设备 {device} 未连接"); sys.exit(1)
 
     ntp_offset = get_ntp_offset()
     sale_ts = get_next_sale_ts()
@@ -185,19 +207,19 @@ def main():
         time.sleep(delta - 5)
 
     print(f"[{_now()}] 建立持久 shell 连接...")
-    shell = PersistentShell(DEVICE)
+    shell = PersistentShell(device)
     time.sleep(0.3)  # 让连接稳定
 
     # 发射前确保在购物车页（back 回去）
     print(f"[{_now()}] 检查页面状态...")
-    subprocess.run(["adb", "-s", DEVICE, "shell", "input", "keyevent", "4"],
+    subprocess.run(["adb", "-s", device, "shell", "input", "keyevent", "4"],
                    capture_output=True, timeout=3)  # BACK 键
     time.sleep(0.5)
 
     # 启动后台检测线程，设最早生效时间为 T+0.3s（防止旧页面误触发）
     _order_detected.clear()
     _detect_start_ts = sale_ts + 0.3   # 开售后至少 300ms 才开始接受检测
-    t = threading.Thread(target=_checker_thread, args=(DEVICE, _detect_start_ts), daemon=True)
+    t = threading.Thread(target=_checker_thread, args=(device, _detect_start_ts), daemon=True)
     t.start()
 
     # 精确等待到 T - TAP_LEAD_MS
@@ -230,7 +252,7 @@ def main():
                 shell.send(f"input tap {PAY_X} {PAY_Y}")
                 time.sleep(0.06)
             subprocess.run(
-                ["adb", "-s", DEVICE, "shell", "cmd", "vibrator", "vibrate", "600"],
+                ["adb", "-s", device, "shell", "cmd", "vibrator", "vibrate", "600"],
                 capture_output=True, timeout=3
             )
             print(f"[{_now()}] 已点击「立即支付」，请在平板上完成指纹/密码支付！")

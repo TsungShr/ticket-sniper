@@ -6,10 +6,10 @@
 
 // ==================== 配置区 ====================
 var CONFIG = {
-    targetPrice: "2380",
+    targetPrice: "1380",
     targetSession: "周六",
     viewerName: "",
-    saleTime: "2026-04-01 10:00:00",
+    saleTime: "2026-04-04 19:00:00",
     maxRetry: 50,
     clickInterval: 80,
 };

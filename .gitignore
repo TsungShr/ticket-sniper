@@ -6,5 +6,19 @@ __pycache__/
 dist/
 build/
 
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
 # Config with credentials - use config.yaml.example as template
 config.yaml
+
+# Captcha images generated during login
+captcha.jpg
+
+# Temporary files
+*.tmp
+/tmp/

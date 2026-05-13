@@ -1,6 +1,7 @@
 import logging
 import time
 import asyncio
+import datetime
 import ntplib
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,21 @@ def get_ntp_offset(server: str = "ntp.aliyun.com", samples: int = 5) -> float:
     median = offsets[len(offsets) // 2]
     logger.info(f"NTP 采样 {len(offsets)} 次，范围 {offsets[0]*1000:.1f}~{offsets[-1]*1000:.1f}ms，中位数 {median*1000:.1f}ms")
     return median
+
+
+def corrected_time(ntp_offset: float) -> float:
+    """返回经过 NTP 校准后的本机时间"""
+    return time.time() + ntp_offset
+
+
+def hms_to_next_ts(hms: str) -> float:
+    """将 HH:MM:SS 转换为距今最近一次该时刻的 Unix 时间戳"""
+    h, m, s = map(int, hms.split(":"))
+    now = datetime.datetime.now()
+    t = now.replace(hour=h, minute=m, second=s, microsecond=0)
+    if t.timestamp() <= now.timestamp():
+        t += datetime.timedelta(days=1)
+    return t.timestamp()
 
 
 async def wait_until_sale_time(sale_timestamp: float, ntp_offset: float) -> None:
