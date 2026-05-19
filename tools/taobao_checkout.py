@@ -45,7 +45,7 @@ def _resolve_device() -> str:
 
     config_path = Path(__file__).parent.parent / "config.yaml"
     if config_path.exists():
-        import yaml, os
+        import yaml
         cfg = yaml.safe_load(config_path.read_text(encoding="utf-8"))
         # 依次检查各平台配置中的 device_id
         for platform in ("maoyan", "damai", "taobao"):

@@ -45,7 +45,7 @@ async def run_orchestrator(
     if not active_grabbers:
         logger.error("所有平台预热失败！")
         await notify(
-            {"notification": notify_config},
+            notify_config,
             "抢票失败",
             "所有平台预热失败",
         )
@@ -88,13 +88,13 @@ async def run_orchestrator(
 
     if result:
         await notify(
-            {"notification": notify_config},
+            notify_config,
             "抢票成功！",
             f"平台: {result['platform']}，订单号: {result.get('order_id')}",
         )
     else:
         await notify(
-            {"notification": notify_config},
+            notify_config,
             "抢票失败",
             "三个平台均未成功",
         )

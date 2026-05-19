@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """票星球 SMS 登录工具 — 获取 Token 并写入 config.yaml"""
+import base64
 import os
+import subprocess
+import sys
+
 import requests
 import yaml
-import sys
 
 API_HOST = "https://m.piaoxingqiu.com"
 API_VER = "4.1.2-20240305183007"
@@ -38,8 +41,7 @@ def send_sms(phone: str) -> bool:
         headers=HEADERS,
     )
     data1 = resp1.json()
-    print(f"[debug] generate_photo_code 响应: statusCode={data1.get('statusCode')}, "
-          f"comments={data1.get('comments', '')}")
+    print(f"[debug] generate_photo_code 响应: statusCode={data1.get('statusCode')}")
 
     if data1.get("statusCode") != 200 or not data1.get("data"):
         print("获取图形验证码失败")
@@ -63,9 +65,17 @@ def send_sms(phone: str) -> bool:
     with open(captcha_path, "wb") as f:
         f.write(img_bytes)
 
-    # macOS 自动打开图片
-    subprocess.Popen(["open", captcha_path])
-    print(f"图形验证码已打开（也保存在 {captcha_path}）")
+    # macOS 自动打开图片（Windows 使用 os.startfile）
+    try:
+        if sys.platform == "darwin":
+            subprocess.Popen(["open", captcha_path])
+        elif sys.platform == "win32":
+            os.startfile(captcha_path)
+        else:
+            subprocess.Popen(["xdg-open", captcha_path])
+    except Exception:
+        pass
+    print(f"图形验证码已保存于 {captcha_path}，请手动打开查看")
     captcha_code = input("请输入图中的字符: ").strip()
 
     # Step 2: 发送短信验证码（token 字段放验证码答案，不是 uniqueIdentity）

@@ -32,7 +32,6 @@ async def send_serverchan(key: str, title: str, body: str) -> None:
         logger.warning(f"ServerChan notification failed: {e}")
 
 
-async def notify(config: dict, title: str, body: str) -> None:
-    nc = config.get("notification", {})
-    await send_bark(nc.get("bark_key", ""), title, body)
-    await send_serverchan(nc.get("serverchan_key", ""), title, body)
+async def notify(notify_config: dict, title: str, body: str) -> None:
+    await send_bark(notify_config.get("bark_key", ""), title, body)
+    await send_serverchan(notify_config.get("serverchan_key", ""), title, body)

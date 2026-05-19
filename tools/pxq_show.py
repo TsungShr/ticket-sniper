@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """票星球演出查询工具 — 获取 show_id, session_id, seat_plan_id"""
 import requests
-import yaml
 import sys
+import yaml
 
 API_HOST = "https://m.piaoxingqiu.com"
 API_VER = "4.1.2-20240305183007"

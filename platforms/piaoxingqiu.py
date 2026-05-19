@@ -9,7 +9,6 @@ from typing import Any
 import aiohttp
 
 from platforms.base import PlatformGrabber
-from utils.http_retry import http_get, http_post
 
 logger = logging.getLogger(__name__)
 
@@ -51,15 +50,25 @@ class PiaoxingqiuGrabber(PlatformGrabber):
         return "".join(random.choices(string.ascii_letters + string.digits, k=length))
 
     def _build_blackbox(self) -> str:
-        prefix = self._random_str(4)
-        ts = str(int(time.time()))
-        suffix = self._random_str(9)
-        base = prefix + ts + suffix
-        result = list(base)
-        for _ in range(4):
+        """构造一个更接近真实 Tongdun 格式的 Blackbox 指纹
+
+        真实格式约为 300~500 字符 base64 串，内部包含时间戳、设备段等结构。
+        此处生成一个带时间戳特征 + 随机数据段的假指纹。
+        """
+        ts_ms = str(int(time.time() * 1000))
+        segments = [
+            self._random_str(6),
+            ts_ms,
+            self._random_str(4),
+            self._random_str(8),
+            self._random_str(3),
+            self._random_str(10),
+        ]
+        result = "".join(segments)
+        for _ in range(8):
             pos = random.randint(0, len(result))
-            result.insert(pos, random.choice(string.ascii_letters + string.digits))
-        return "".join(result)
+            result = result[:pos] + random.choice(string.ascii_letters + string.digits) + result[pos:]
+        return result
 
     def _build_order_payload(
         self,
@@ -158,7 +167,10 @@ class PiaoxingqiuGrabber(PlatformGrabber):
                 "platform": self.name,
                 "order_id": order_id,
             }
-        raise RuntimeError(f"attempt {attempt} failed: {result.get('comments', result)}")
+        comments = result.get("comments", "")
+        if status == 469:
+            raise RuntimeError(f"风控拦截 (469): {comments}")
+        raise RuntimeError(f"attempt {attempt} failed: {comments or result}")
 
     async def grab(self) -> dict[str, Any]:
         await self.wait_for_sale()

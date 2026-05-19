@@ -13,8 +13,12 @@ NTP_SERVERS = [
 ]
 
 
-def get_ntp_offset(server: str = "ntp.aliyun.com", samples: int = 5) -> float:
-    """多次采样取中位数，减少网络抖动误差"""
+def get_ntp_offset(samples: int = 5) -> float:
+    """多次采样取中位数，减少网络抖动误差
+
+    Args:
+        samples: 每个 NTP 服务器采样次数
+    """
     client = ntplib.NTPClient()
     offsets = []
     for srv in NTP_SERVERS:
@@ -51,7 +55,7 @@ def hms_to_next_ts(hms: str) -> float:
 
 async def wait_until_sale_time(sale_timestamp: float, ntp_offset: float) -> None:
     while True:
-        now = time.time() + ntp_offset
+        now = corrected_time(ntp_offset)
         remaining = sale_timestamp - now
         if remaining <= 0:
             break
